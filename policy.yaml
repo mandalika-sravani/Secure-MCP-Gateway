@@ -1,0 +1,54 @@
+# Gateway policy. Default-deny: a tool the server exposes but is not listed here is invisible
+# and uncallable (e.g. hr.export_all_salaries).
+rate_limit:
+  max_calls: 30
+  window_seconds: 60
+max_output_chars: 6000
+max_string_arg_chars: 300
+egress_blocked_taints: [confidential, restricted]
+
+roles:
+  employee:
+    - hr.get_employee_profile
+    - hr.get_salary
+    - docs.search_docs
+    - docs.read_doc
+  manager:
+    - hr.get_employee_profile
+    - hr.get_salary
+    - hr.list_team
+    - docs.search_docs
+    - docs.read_doc
+    - comms.send_email
+  admin:
+    - hr.get_employee_profile
+    - hr.get_salary
+    - hr.list_team
+    - docs.search_docs
+    - docs.read_doc
+    - comms.send_email
+
+tools:
+  hr.get_employee_profile:
+    risk: read
+    arg_patterns: {employee_id: '^E\d{3}$'}
+  hr.get_salary:
+    risk: read
+    taints: restricted          # reading it marks the session; egress is then blocked
+    arg_patterns: {employee_id: '^E\d{3}$'}
+  hr.list_team:
+    risk: read
+    arg_patterns: {department: '^[A-Za-z]{2,20}$'}
+  docs.search_docs:
+    risk: read
+    arg_patterns: {query: '^[\w \-]{1,80}$'}
+  docs.read_doc:
+    risk: read
+    arg_patterns: {doc_id: '^D\d{1,3}$'}      # taint comes from the doc's own classification
+  comms.send_email:
+    risk: external_write
+    egress: true
+    requires_approval: true
+    allowed_recipient_domains: [acme.com]
+    arg_patterns: {to: '^[\w.+-]+@[\w-]+(\.[\w-]+)+$'}   # exactly one address
+    arg_max_len: {body: 2000, subject: 120}

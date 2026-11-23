@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secure MCP Gateway</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#16191d;--mut:#667085;--line:#e4e7ec;--ok:#067647;--okbg:#e7f6ee;--no:#b42318;--nobg:#fdecea;--warn:#93370d;--warnbg:#fff4e5;--acc:#2f5bea;--accbg:#eaf0ff}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--ink:#e8eaee;--mut:#98a2b3;--line:#272c36;--ok:#4ade80;--okbg:#10291b;--no:#f87171;--nobg:#2f1517;--warn:#fdba74;--warnbg:#2b1d0e;--acc:#7b9bff;--accbg:#1b2440}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+header h1{font-size:16px;margin:0}header .sub{color:var(--mut);font-size:12px}
+.spacer{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;color:var(--ink);padding:5px 12px;cursor:pointer;font:inherit}
+.seg button.on{background:var(--acc);color:#fff}.seg button:disabled{opacity:.4;cursor:not-allowed}
+main{display:grid;grid-template-columns:260px minmax(380px,1fr) 400px;gap:14px;padding:14px;height:calc(100vh - 54px)}
+@media (max-width:1100px){main{grid-template-columns:1fr;height:auto}}
+.col{display:flex;flex-direction:column;gap:14px;min-height:0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:0}
+.card h2{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:0 0 8px}
+.user{display:block;width:100%;text-align:left;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font:inherit}
+.user.on{border-color:var(--acc);background:var(--accbg)}.user b{display:block}.user span{color:var(--mut);font-size:12px}
+.chip{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:999px;padding:1px 8px;margin:0 4px 4px 0;color:var(--mut)}
+.badge{display:inline-block;font-size:11px;font-weight:600;border-radius:6px;padding:1px 7px}
+.b-ok{color:var(--ok);background:var(--okbg)}.b-no{color:var(--no);background:var(--nobg)}.b-warn{color:var(--warn);background:var(--warnbg)}
+button.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:5px 10px;cursor:pointer;font:inherit}
+button.btn:hover{border-color:var(--acc)}button.btn:disabled{opacity:.5;cursor:not-allowed}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.chat{flex:1;display:flex;flex-direction:column;min-height:0}
+.msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:10px;padding:2px}
+.msg{max-width:88%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word}
+.msg.u{align-self:flex-end;background:var(--acc);color:#fff}.msg.a{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
+.msg.sys{align-self:center;color:var(--mut);font-size:12px;background:none}
+.toolline{align-self:flex-start;font:12px ui-monospace,Menlo,Consolas,monospace;color:var(--mut)}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.composer{display:flex;gap:8px}.composer input{flex:1;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+.trace,.audit{overflow:auto;flex:1;min-height:0}
+.row{border-bottom:1px solid var(--line);padding:7px 0}.row:last-child{border:0}
+.row code{font:12px ui-monospace,Menlo,Consolas,monospace}.row .why{color:var(--mut);font-size:12px;margin-top:2px}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1}
+table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:4px 5px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{color:var(--mut);font-weight:600}
+.empty{color:var(--mut);font-size:12px}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);max-width:460px;padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.45)}dialog pre{background:var(--bg);padding:10px;border-radius:8px;white-space:pre-wrap;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <div><h1>Secure MCP Gateway</h1><div class="sub">Agent tool calls are checked per user, per tool, per argument, per data classification</div></div>
+  <div class="spacer"></div>
+  <span id="mode-note" class="sub"></span>
+  <div class="seg" id="mode"><button data-m="replay" class="on">Replay</button><button data-m="live">Live Claude</button></div>
+</header>
+<main>
+  <div class="col">
+    <div class="card"><h2>Sign in as</h2><div id="users"></div></div>
+    <div class="card"><h2>Tools this role can see</h2><div id="tools"></div></div>
+    <div class="card"><h2>Session state</h2><div id="state"></div>
+      <div style="margin-top:8px"><button class="btn" id="reset">Reset session</button></div></div>
+  </div>
+  <div class="col">
+    <div class="card chat">
+      <h2 id="chat-title">Chat</h2>
+      <div class="msgs" id="msgs"></div>
+      <div class="quick" id="quick"></div>
+      <form class="composer" id="form"><input id="text" placeholder="Ask anything (Live mode)" autocomplete="off"><button class="btn primary" id="send">Send</button></form>
+    </div>
+  </div>
+  <div class="col">
+    <div class="card" style="flex:1;display:flex;flex-direction:column">
+      <div class="tabs"><button class="btn" data-t="trace">Gateway decisions</button><button class="btn" data-t="audit">Audit log <span id="ver"></span></button></div>
+      <div class="trace" id="trace"></div>
+      <div class="audit" id="audit" hidden></div>
+    </div>
+  </div>
+</main>
+<dialog id="dlg"><h3 style="margin-top:0">Human approval required</h3>
+  <p id="dlg-q"></p><pre id="dlg-args"></pre>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="no">Reject</button><button class="btn primary" id="yes">Approve</button></div>
+</dialog>
+<script>
+const $=s=>document.querySelector(s);
+function h(tag,attrs={},...kids){const e=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else e.setAttribute(k,v)}
+  for(const k of kids.flat())if(k!=null)e.append(k.nodeType?k:document.createTextNode(k));return e}
+const api=(p,o)=>fetch(p,o).then(async r=>{if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.statusText);return r.json()});
+
+const WHY=[[/tool_not_allowed/,'Tool not permitted for this role'],[/server_denied/,'MCP server refused: caller may not see this data'],
+ [/session_tainted/,'Blocked: session already holds restricted data'],[/injection_seen/,'Blocked: prompt injection seen earlier in session'],
+ [/recipient_domain/,'Blocked: recipient outside allowed domains'],[/approval_not_granted/,'Human did not approve'],
+ [/invalid_args/,'Rejected: arguments failed validation'],[/rate_limited/,'Rate limit exceeded'],[/identity_spoof/,'Rejected: tried to set caller identity']];
+const why=r=>(WHY.find(([re])=>re.test(r||''))||[0,r||''])[1];
+
+let users=[],scenarios=[],cur=null,mode='replay',live=false,busy=false;
+const chats={},traces={};   // per-user DOM, so switching users keeps each history
+
+function ensure(k){if(!chats[k]){chats[k]=h('div',{class:'msgs-inner',style:'display:flex;flex-direction:column;gap:10px'});traces[k]=h('div',{});
+  chats[k].append(h('div',{class:'msg sys'},'New session. Pick a scenario below.'));traces[k].append(h('div',{class:'empty'},'Tool-call decisions appear here as they happen.'))}}
+
+function renderUsers(){const box=$('#users');box.replaceChildren(...users.map(u=>h('button',{class:'user'+(u.key===cur?' on':''),onclick:()=>select(u.key)},
+  h('b',{},u.name),h('span',{},`${u.role} · ${u.department} · ${u.user_id}`))))}
+
+async function select(k){if(busy)return;cur=k;ensure(k);renderUsers();
+  const u=users.find(x=>x.key===k);$('#chat-title').textContent=`Chat as ${u.name} (${u.role})`;
+  $('#msgs').replaceChildren(chats[k]);$('#trace').replaceChildren(traces[k]);await refresh();scroll()}
+
+async function refresh(){
+  const [tools,state]=await Promise.all([api('/api/tools/'+cur),api('/api/state/'+cur)]);
+  $('#tools').replaceChildren(...tools.map(t=>h('span',{class:'chip',title:t.description},t.name)));
+  const s=[];state.taints.forEach(t=>s.push(h('span',{class:'badge b-warn',style:'margin-right:4px'},'tainted: '+t)));
+  if(state.injection_seen)s.push(h('span',{class:'badge b-no'},'injection seen'));
+  $('#state').replaceChildren(...(s.length?s:[h('span',{class:'badge b-ok'},'clean')]),
+    h('div',{class:'empty',style:'margin-top:6px'},'Tainted sessions cannot send data out.'));
+  loadAudit()}
+
+async function loadAudit(){const a=await api('/api/audit?limit=60');
+  $('#ver').replaceChildren(h('span',{class:'badge '+(a.verified?'b-ok':'b-no')},a.verified?'chain ✓':'TAMPERED'));
+  $('#audit').replaceChildren(h('table',{},h('thead',{},h('tr',{},...['#','user','event','decision','reason'].map(x=>h('th',{},x)))),
+    h('tbody',{},...a.records.map(r=>h('tr',{},h('td',{},r.seq),h('td',{},r.user||'-'),h('td',{},r.tool||r.event),
+      h('td',{},h('span',{class:'badge '+(r.decision==='allow'?'b-ok':'b-no')},r.decision)),h('td',{title:r.reason||''},why(r.reason)))))))}
+
+const scroll=()=>{const m=$('#msgs');m.scrollTop=m.scrollHeight};
+const add=(cls,txt)=>{const e=h('div',{class:'msg '+cls},txt);chats[cur].append(e);scroll();return e};
+const argText=a=>Object.entries(a||{}).map(([k,v])=>`${k}=${JSON.stringify(v)}`).join(', ');
+
+function traceRow(ev){const t=traces[cur];if(t.querySelector('.empty'))t.replaceChildren();const d=ev.decision||{};
+  t.prepend(h('div',{class:'row'},h('span',{class:'badge '+(ev.ok?'b-ok':'b-no')},ev.ok?'ALLOWED':'DENIED'),' ',h('code',{},ev.tool),
+    h('div',{class:'why'},'('+argText(ev.input)+')'),
+    h('div',{class:'why',title:d.reason||''},ev.ok?(d.injection_hits?`Output redacted: ${d.injection_hits} suspected injection(s)`:'Passed all checks'+(d.taints&&d.taints.length?' · session now tainted: '+d.taints.join(', '):'')):why(d.reason))))}
+
+function approve(ev){return new Promise(res=>{$('#dlg-q').textContent=`${ev.user} wants to run ${ev.tool}:`;$('#dlg-args').textContent=JSON.stringify(ev.args,null,2);
+  const done=v=>{$('#dlg').close();api('/api/approve',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:ev.id,approve:v})}).catch(()=>{});res()};
+  $('#yes').onclick=()=>done(true);$('#no').onclick=()=>done(false);$('#dlg').oncancel=e=>{e.preventDefault();done(false)};$('#dlg').showModal()})}
+
+async function run(body,label){if(busy)return;busy=true;setBusy();add('u',label);let bubble=null;
+  try{const r=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:cur,mode,...body})});
+    if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.statusText);
+    const rd=r.body.getReader(),dec=new TextDecoder();let buf='';
+    for(;;){const{value,done}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf('\n\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+2);if(!line.startsWith('data: '))continue;const ev=JSON.parse(line.slice(6));
+        if(ev.type==='tool'){traceRow(ev);add('toolline',`${ev.ok?'✓':'✗'} ${ev.tool}`)}
+        else if(ev.type==='approval_request'){add('sys','Waiting for human approval…');await approve(ev)}
+        else if(ev.type==='answer')add('a',ev.text||'(no answer)');
+        else if(ev.type==='error')add('sys','Error: '+ev.text)}}
+  }catch(e){add('sys','Error: '+e.message)}
+  busy=false;setBusy();await refresh()}
+
+function setBusy(){document.querySelectorAll('button.user,#send,#reset,.qbtn').forEach(b=>b.disabled=busy);$('#text').disabled=busy||mode!=='live'}
+function renderQuick(){$('#quick').replaceChildren(...scenarios.map(s=>h('button',{class:'btn qbtn',onclick:()=>run(mode==='live'?{message:s.message}:{scenario:s.id},s.message)},s.label)))}
+function setMode(m){mode=m;document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));
+  $('#form').style.display=m==='live'?'flex':'none';
+  $('#mode-note').textContent=m==='live'?'Real Claude chooses the tool calls':'Scripted model, deterministic, no API key';setBusy()}
+
+$('#mode').addEventListener('click',e=>{const m=e.target.dataset.m;if(m&&!e.target.disabled)setMode(m)});
+$('#form').addEventListener('submit',e=>{e.preventDefault();const t=$('#text').value.trim();if(!t)return;$('#text').value='';run({message:t},t)});
+$('#reset').onclick=async()=>{await api('/api/reset/'+cur,{method:'POST'});add('sys','Session reset: taint cleared.');await refresh()};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{const a=b.dataset.t==='audit';$('#trace').hidden=a;$('#audit').hidden=!a;if(a)loadAudit()});
+
+(async()=>{[users,scenarios]=await Promise.all([api('/api/users'),api('/api/scenarios')]);const c=await api('/api/config');live=c.live;
+  document.querySelector('#mode [data-m=live]').disabled=!live;if(!live)document.querySelector('#mode [data-m=live]').title='Set ANTHROPIC_API_KEY and restart to enable';
+  renderQuick();setMode('replay');await select('bob')})();
+</script>
+</body>
+</html>
